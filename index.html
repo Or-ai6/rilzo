@@ -1,0 +1,329 @@
+<!doctype html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>ריזלו</title>
+<link href="https://fonts.googleapis.com/css2?family=Heebo:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+:root{--p:#0B2166;--bg:#F5F7FB;--c:#fff;--t:#0F1B3D;--m:#5B6788;--b:#DDE3EE;--a:#3F8AE0;--r:#E5484D}
+@media(prefers-color-scheme:dark){:root{--p:#6B8BFF;--bg:#0A0E1F;--c:#10162E;--t:#E8EDFF;--m:#98A3C7;--b:#252E52}}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--t);font:15px/1.5 Heebo,Arial,sans-serif}
+#app{max-width:600px;margin:0 auto;min-height:100vh;padding-bottom:70px}
+button,input,textarea{font:inherit;color:inherit}
+input,textarea{width:100%;padding:11px 12px;border:1px solid var(--b);border-radius:12px;background:var(--c);margin-top:8px}
+.btn{background:var(--p);color:#fff;border:0;border-radius:12px;padding:11px 18px;font-weight:500;cursor:pointer}
+.btn.o{background:none;color:var(--t);border:1px solid var(--b)}.btn:disabled{opacity:.5}
+.box{padding:40px 20px}.box h1{margin:0 0 4px}.lnk{background:none;border:0;color:var(--a);cursor:pointer;padding:0}
+.hd{position:sticky;top:0;background:var(--c);border-bottom:1px solid var(--b);padding:10px 14px;display:flex;align-items:center;gap:8px;z-index:5;font-weight:700;font-size:17px}
+.mk{width:26px;height:26px;border-radius:8px;background:var(--p);color:var(--c);display:inline-flex;align-items:center;justify-content:center}
+.card{background:var(--c);border-bottom:1px solid var(--b);margin-bottom:10px}
+.ph{display:flex;align-items:center;gap:10px;padding:10px 14px}
+.av{width:36px;height:36px;border-radius:50%;background:var(--p);color:var(--c);display:flex;align-items:center;justify-content:center;font-weight:500;overflow:hidden;flex:none}
+.av img{width:100%;height:100%;object-fit:cover}
+.img{width:100%;aspect-ratio:1;object-fit:cover;display:block;background:var(--b)}
+.act{display:flex;gap:16px;padding:8px 14px;font-size:22px}.act button{background:none;border:0;cursor:pointer;padding:0}
+.cap{padding:0 14px 12px}.m{color:var(--m);font-size:13px}.u{font-weight:500;cursor:pointer}
+nav{position:fixed;bottom:0;left:0;right:0;background:var(--c);border-top:1px solid var(--b);display:flex;justify-content:center;z-index:5}
+nav div{display:flex;max-width:600px;width:100%}nav button{flex:1;background:none;border:0;padding:12px 0;font-size:13px;color:var(--m);cursor:pointer}
+nav button.on{color:var(--p);font-weight:700}
+.grid{display:grid;grid-template-columns:repeat(3,1fr);gap:3px}.grid img{width:100%;aspect-ratio:1;object-fit:cover;cursor:pointer}
+.sh{position:fixed;inset:0;background:#0009;z-index:20;display:flex;align-items:flex-end;justify-content:center}
+.sh>div{background:var(--c);width:100%;max-width:600px;max-height:80vh;overflow:auto;border-radius:18px 18px 0 0;padding:16px}
+.cm{padding:8px 0;border-bottom:1px solid var(--b)}
+#toast{position:fixed;bottom:80px;left:50%;transform:translateX(-50%);background:var(--p);color:var(--c);padding:10px 16px;border-radius:12px;z-index:30;display:none}
+.pad{padding:14px}
+</style>
+</head>
+<body>
+<div id="app"></div><div id="toast"></div>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+<script>
+// ===== הגדרות: אפשר למלא כאן, או להזין במסך ההגדרה הראשון (נשמר בדפדפן הזה בלבד) =====
+const SUPABASE_URL = "";
+const SUPABASE_KEY = "";
+// ================================================================================
+const $ = s => document.querySelector(s), app = $('#app');
+const cfg = { url: SUPABASE_URL || localStorage.sbu || '', key: SUPABASE_KEY || localStorage.sbk || '' };
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const ago = d => { const s = (Date.now() - new Date(d)) / 1000; if (s < 60) return 'עכשיו'; if (s < 3600) return `לפני ${Math.floor(s/60)} דקות`; if (s < 86400) return `לפני ${Math.floor(s/3600)} שעות`; return new Date(d).toLocaleDateString('he-IL'); };
+const toast = t => { const e = $('#toast'); e.textContent = t; e.style.display = 'block'; setTimeout(() => e.style.display = 'none', 2600); };
+const av = (p, n = 36) => `<div class="av" style="width:${n}px;height:${n}px">${p?.avatar_url ? `<img src="${esc(p.avatar_url)}" alt="">` : esc((p?.display_name || p?.username || '?')[0])}</div>`;
+let sb, me, prof, view = 'home', timer, fresh = false;
+
+if (!cfg.url || !cfg.key) {
+  app.innerHTML = `<div class="box"><h1>חיבור ל-Supabase</h1><p class="m">Settings ← API: העתיקו את Project URL ואת מפתח ה-anon public.</p><input id="u" placeholder="https://xxxx.supabase.co" dir="ltr"><input id="k" placeholder="anon public key" dir="ltr"><p><button class="btn" id="go">שמירה</button></p></div>`;
+  $('#go').onclick = () => { localStorage.sbu = $('#u').value.trim(); localStorage.sbk = $('#k').value.trim(); location.reload(); };
+} else boot();
+
+async function boot() {
+  sb = supabase.createClient(cfg.url, cfg.key);
+  const { data: { session } } = await sb.auth.getSession();
+  if (!session) return authScreen();
+  me = session.user;
+  let { data: p } = await sb.from('profile').select('*').eq('user_id', me.id).maybeSingle();
+  if (!p) {
+    const md = me.user_metadata || {};
+    const username = md.username || me.email.split('@')[0].toLowerCase().replace(/[^a-z0-9._]/g, '').slice(0, 20).padEnd(3, '0');
+    const r = await sb.from('profile').insert({ user_id: me.id, username, display_name: md.display_name || username, onboarded: true, created_by_id: me.id }).select().single();
+    if (r.error) { await sb.auth.signOut(); return authScreen('שם המשתמש תפוס. נסו להירשם עם שם אחר.'); }
+    p = r.data; fresh = true;
+  }
+  prof = p; show(fresh ? 'onb' : 'home');
+}
+
+function authScreen(msg = '') {
+  let signup = false;
+  const draw = () => {
+    app.innerHTML = `<div class="box"><h1><span class="mk">ר</span> ריזלו</h1><p class="m">${signup ? 'יצירת חשבון' : 'התחברו כדי להמשיך'}</p>
+    <p style="color:var(--r)">${esc(msg)}</p>
+    <input id="un" placeholder="שם משתמש (אנגלית קטנה, ספרות . _)" dir="ltr" autocomplete="username" maxlength="20">
+    ${signup ? '<input id="dn" placeholder="שם תצוגה (איך יקראו לכם)" maxlength="30">' : ''}
+    <input id="pw" type="password" placeholder="סיסמה (8 תווים לפחות)" dir="ltr" autocomplete="${signup ? 'new-password' : 'current-password'}">
+    <p><button class="btn" id="ok" style="width:100%">${signup ? 'הרשמה' : 'התחברות'}</button></p>
+    <p class="m" style="text-align:center">${signup ? 'יש כבר חשבון?' : 'אין חשבון?'} <button class="lnk" id="sw">${signup ? 'התחברות' : 'הרשמה'}</button></p></div>`;
+    $('#sw').onclick = () => { signup = !signup; msg = ''; draw(); };
+    $('#ok').onclick = async () => {
+      const username = $('#un').value.trim().toLowerCase(), password = $('#pw').value;
+      if (!/^[a-z0-9._]{3,20}$/.test(username)) { msg = 'שם משתמש: 3–20 תווים, אנגלית קטנה, ספרות, נקודה או קו תחתון'; return draw(); }
+      if (password.length < 8) { msg = 'הסיסמה חייבת להכיל לפחות 8 תווים'; return draw(); }
+      const email = username + '@rizlo.app';
+      $('#ok').disabled = true;
+      if (signup) {
+        const display_name = ($('#dn').value.trim() || username).slice(0, 30);
+        const { data, error } = await sb.auth.signUp({ email, password, options: { data: { username, display_name } } });
+        if (error) { msg = /already|registered/i.test(error.message) ? 'שם המשתמש תפוס, בחרו אחר' : error.message; return draw(); }
+        if (!data.session) { msg = 'ההרשמה נקלטה אבל נדרש אישור מייל. יש לכבות Confirm email ב-Supabase.'; signup = false; return draw(); }
+      } else {
+        const { error } = await sb.auth.signInWithPassword({ email, password });
+        if (error) { msg = 'שם המשתמש או הסיסמה שגויים'; return draw(); }
+      }
+      boot();
+    };
+  };
+  draw();
+}
+
+function shell(title, html) {
+  clearInterval(timer);
+  app.innerHTML = `<div class="hd"><span class="mk">ר</span> ${esc(title)}<button class="lnk" id="bell" aria-label="התראות" style="margin-inline-start:auto;font-size:20px">🔔<sup id="bc" style="color:var(--r)"></sup></button></div>${html}
+  <nav><div>${[['home','בית'],['search','חיפוש'],['new','פוסט'],['msg','הודעות'],['me','פרופיל']].map(([k, l]) => `<button data-v="${k}" class="${view === k ? 'on' : ''}">${l}</button>`).join('')}</div></nav>`;
+  app.querySelectorAll('nav button').forEach(b => b.onclick = () => show(b.dataset.v));
+  $('#bell').onclick = () => show('notif');
+  sb.from('notification').select('id', { count: 'exact', head: true }).eq('user_id', me.id).eq('is_read', false).then(r => { const e = $('#bc'); if (e && r.count) e.textContent = r.count; });
+}
+function show(v, arg) { view = v; ({ home, search, new: newPost, msg, me: () => profile(prof.username), user: () => profile(arg), chat: () => chat(arg), notif, settings, onb, legal: () => legal(arg) })[v](); window.scrollTo(0, 0); }
+const bindUsers = () => app.querySelectorAll('[data-user]').forEach(e => e.onclick = () => show('user', e.dataset.user));
+const other = c => c.user_a_id === me.id ? { id: c.user_b_id, u: c.user_b_username, n: c.user_b_display_name, a: c.user_b_avatar } : { id: c.user_a_id, u: c.user_a_username, n: c.user_a_display_name, a: c.user_a_avatar };
+const followUser = (uid, uname) => sb.from('follow').insert({ follower_id: me.id, follower_username: prof.username, following_id: uid, following_username: uname, status: 'accepted', created_by_id: me.id });
+async function uploadAvatar(file) {
+  if (!file || file.size > 5 * 1024 * 1024) return toast('בחרו תמונה עד 5MB');
+  const path = `${me.id}/avatar-${Date.now()}`;
+  const up = await sb.storage.from('media').upload(path, file, { contentType: file.type });
+  if (up.error) return toast('ההעלאה נכשלה');
+  const url = sb.storage.from('media').getPublicUrl(path).data.publicUrl;
+  await sb.from('profile').update({ avatar_url: url }).eq('user_id', me.id);
+  prof.avatar_url = url; toast('התמונה עודכנה'); return true;
+}
+
+async function home() {
+  shell('ריזלו', '<p class="pad m">טוען...</p>');
+  const { data: posts, error } = await sb.from('post').select('*').eq('is_archived', false).order('created_date', { ascending: false }).limit(30);
+  if (error) return shell('ריזלו', `<p class="pad">שגיאה בטעינה: ${esc(error.message)}</p>`);
+  const ids = posts.map(p => p.id);
+  const { data: likes } = ids.length ? await sb.from('post_like').select('post_id').eq('user_id', me.id).in('post_id', ids) : { data: [] };
+  const liked = new Set((likes || []).map(l => l.post_id));
+  shell('ריזלו', posts.length ? posts.map(p => card(p, liked.has(p.id))).join('') : '<p class="pad m" style="text-align:center">אין פוסטים עדיין. פרסמו את הראשון!</p>');
+  bindCards(posts, liked);
+}
+function card(p, liked) {
+  return `<article class="card" data-id="${p.id}"><div class="ph">${av({ avatar_url: p.author_avatar, display_name: p.author_display_name || p.author_username })}
+  <div style="flex:1"><div class="u" data-user="${esc(p.author_username)}">${esc(p.author_username)}</div><div class="m">${ago(p.created_date)}</div></div></div>
+  ${p.images?.[0] ? `<img class="img" src="${esc(p.images[0])}" alt="${esc(p.caption || 'פוסט')}" loading="lazy">` : ''}
+  <div class="act"><button class="lk" aria-label="לייק" style="color:${liked ? 'var(--r)' : 'inherit'}">${liked ? '♥' : '♡'}</button><button class="cmb" aria-label="תגובות">💬</button></div>
+  <div class="cap"><div><b class="lc">${p.likes_count || 0}</b> לייקים · <span class="cc">${p.comments_count || 0}</span> תגובות</div>${p.caption ? `<div><span class="u" data-user="${esc(p.author_username)}">${esc(p.author_username)}</span> ${esc(p.caption)}</div>` : ''}</div></article>`;
+}
+function bindCards(posts, liked) {
+  app.querySelectorAll('[data-user]').forEach(e => e.onclick = () => show('user', e.dataset.user));
+  app.querySelectorAll('.card').forEach(el => {
+    const p = posts.find(x => x.id === el.dataset.id), lk = el.querySelector('.lk'), lc = el.querySelector('.lc');
+    lk.onclick = async () => {
+      const on = liked.has(p.id); on ? liked.delete(p.id) : liked.add(p.id);
+      lk.textContent = on ? '♡' : '♥'; lk.style.color = on ? 'inherit' : 'var(--r)';
+      lc.textContent = Math.max(0, +lc.textContent + (on ? -1 : 1));
+      const r = on ? await sb.from('post_like').delete().eq('post_id', p.id).eq('user_id', me.id)
+                   : await sb.from('post_like').insert({ post_id: p.id, post_author_id: p.author_id, user_id: me.id, username: prof.username, created_by_id: me.id });
+      if (r.error) toast('הלייק לא נשמר');
+    };
+    el.querySelector('.cmb').onclick = () => comments(p, el.querySelector('.cc'));
+  });
+}
+async function comments(p, counter) {
+  const sh = document.createElement('div'); sh.className = 'sh';
+  sh.innerHTML = '<div><b>תגובות</b><div id="cl"></div><div style="display:flex;gap:8px;margin-top:10px"><input id="ci" placeholder="הוסיפו תגובה..." maxlength="300"><button class="btn" id="cs">שלח</button></div></div>';
+  sh.onclick = e => { if (e.target === sh) sh.remove(); }; document.body.appendChild(sh);
+  const load = async () => {
+    const { data } = await sb.from('comment').select('*').eq('post_id', p.id).order('created_date');
+    sh.querySelector('#cl').innerHTML = (data || []).map(c => `<div class="cm"><b>${esc(c.username)}</b> ${esc(c.text)}<div class="m">${ago(c.created_date)}</div></div>`).join('') || '<p class="m">היו הראשונים להגיב</p>';
+    counter.textContent = (data || []).length;
+  };
+  await load();
+  sh.querySelector('#cs').onclick = async () => {
+    const t = sh.querySelector('#ci').value.trim(); if (!t) return;
+    const r = await sb.from('comment').insert({ post_id: p.id, post_author_id: p.author_id, author_id: me.id, username: prof.username, display_name: prof.display_name, text: t.slice(0, 300), created_by_id: me.id });
+    if (r.error) return toast('התגובה לא נשלחה');
+    sh.querySelector('#ci').value = ''; load();
+  };
+}
+
+function newPost() {
+  shell('פוסט חדש', `<div class="pad"><input type="file" id="f" accept="image/jpeg,image/png,image/webp"><img id="pv" class="img" style="display:none;margin-top:10px;border-radius:12px" alt="תצוגה מקדימה"><textarea id="cp" rows="3" maxlength="500" placeholder="כתבו כיתוב... אפשר #האשטגים"></textarea><p><button class="btn" id="pb" style="width:100%">פרסום</button></p></div>`);
+  $('#f').onchange = e => { const f = e.target.files[0]; if (f) { $('#pv').src = URL.createObjectURL(f); $('#pv').style.display = 'block'; } };
+  $('#pb').onclick = async () => {
+    const f = $('#f').files[0];
+    if (!f) return toast('בחרו תמונה');
+    if (f.size > 5 * 1024 * 1024) return toast('התמונה גדולה מדי (עד 5MB)');
+    $('#pb').disabled = true; $('#pb').textContent = 'מעלה...';
+    const path = `${me.id}/${Date.now()}-${f.name.replace(/[^a-zA-Z0-9._-]/g, '_')}`;
+    const up = await sb.storage.from('media').upload(path, f, { contentType: f.type });
+    if (up.error) { toast('ההעלאה נכשלה: ' + up.error.message); $('#pb').disabled = false; $('#pb').textContent = 'פרסום'; return; }
+    const url = sb.storage.from('media').getPublicUrl(path).data.publicUrl, cap = $('#cp').value.trim();
+    const r = await sb.from('post').insert({ author_id: me.id, author_username: prof.username, author_display_name: prof.display_name, author_avatar: prof.avatar_url || '', media_type: 'image', images: [url], caption: cap, hashtags: [...new Set((cap.match(/#([\u0590-\u05FFa-zA-Z0-9_]+)/g) || []).map(h => h.slice(1).toLowerCase()))], created_by_id: me.id });
+    if (r.error) { toast('הפרסום נכשל: ' + r.error.message); $('#pb').disabled = false; $('#pb').textContent = 'פרסום'; return; }
+    toast('הפוסט פורסם'); show('home');
+  };
+}
+
+async function profile(username) {
+  shell(username, '<p class="pad m">טוען...</p>');
+  const { data: p } = await sb.from('profile').select('*').eq('username', username).maybeSingle();
+  if (!p) return shell('פרופיל', '<p class="pad">הפרופיל לא נמצא.</p>');
+  const cnt = col => sb.from('follow').select('id', { count: 'exact', head: true }).eq(col, p.user_id).eq('status', 'accepted').then(r => r.count || 0);
+  const [{ data: posts }, fr, fg, { data: rel }] = await Promise.all([
+    sb.from('post').select('*').eq('author_id', p.user_id).eq('is_archived', false).order('created_date', { ascending: false }),
+    cnt('following_id'), cnt('follower_id'),
+    sb.from('follow').select('id').eq('follower_id', me.id).eq('following_id', p.user_id).maybeSingle()]);
+  const own = p.user_id === me.id;
+  shell(p.username, `<div class="pad" style="background:var(--c)"><div style="display:flex;gap:14px;align-items:center">${av(p, 72)}<div><div style="font-weight:700;font-size:17px">${esc(p.display_name)}</div><div class="m">@${esc(p.username)}</div></div></div>
+  <p class="m"><b style="color:var(--t)">${(posts || []).length}</b> פוסטים · <b style="color:var(--t)">${fr}</b> עוקבים · <b style="color:var(--t)">${fg}</b> נעקבים</p>
+  ${p.bio ? `<p>${esc(p.bio)}</p>` : ''}
+  <div style="display:flex;gap:8px">${own ? '<button class="btn o" id="st" style="flex:1">הגדרות ועריכה</button>' : `<button class="btn ${rel ? 'o' : ''}" id="fl" style="flex:1">${rel ? 'עוקב' : 'עקוב'}</button><button class="btn o" id="ms" style="flex:1">הודעה</button>`}</div></div>
+  <div class="grid">${(posts || []).map(x => `<img src="${esc(x.images?.[0] || '')}" alt="${esc(x.caption || 'פוסט')}" loading="lazy">`).join('')}</div>`);
+  if (own) $('#st').onclick = () => show('settings');
+  else {
+    $('#fl').onclick = async () => { const r = rel ? await sb.from('follow').delete().eq('id', rel.id) : await followUser(p.user_id, p.username); if (r.error) toast('הפעולה נכשלה'); profile(username); };
+    $('#ms').onclick = () => openConv(p);
+  }
+}
+
+async function openConv(o) {
+  const [a, b] = me.id < o.user_id ? [prof, o] : [o, prof];
+  let { data: c } = await sb.from('conversation').select('*').eq('user_a_id', a.user_id).eq('user_b_id', b.user_id).maybeSingle();
+  if (!c) {
+    const r = await sb.from('conversation').insert({ user_a_id: a.user_id, user_a_username: a.username, user_a_display_name: a.display_name, user_a_avatar: a.avatar_url || '', user_b_id: b.user_id, user_b_username: b.username, user_b_display_name: b.display_name, user_b_avatar: b.avatar_url || '', last_message: '', last_message_at: new Date().toISOString(), created_by_id: me.id }).select().single();
+    if (r.error) return toast('לא ניתן לפתוח שיחה'); c = r.data;
+  }
+  show('chat', c);
+}
+async function msg() {
+  shell('הודעות', '<p class="pad m">טוען...</p>');
+  const [{ data: cs }, { data: un }] = await Promise.all([
+    sb.from('conversation').select('*').or(`user_a_id.eq.${me.id},user_b_id.eq.${me.id}`).order('last_message_at', { ascending: false }),
+    sb.from('message').select('conversation_id').eq('receiver_id', me.id).eq('is_read', false)]);
+  const n = {}; (un || []).forEach(m => n[m.conversation_id] = (n[m.conversation_id] || 0) + 1);
+  shell('הודעות', (cs || []).map(c => { const o = other(c); return `<div class="ph card" data-c="${c.id}" style="cursor:pointer">${av({ avatar_url: o.a, display_name: o.n || o.u }, 44)}<div style="flex:1;min-width:0"><div class="u">${esc(o.u)}</div><div class="m" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc((c.last_sender_id === me.id ? 'אתה: ' : '') + (c.last_message || 'התחילו שיחה'))}</div></div>${n[c.id] ? `<b style="color:var(--r)">${n[c.id]}</b>` : ''}</div>`; }).join('') || '<p class="pad m">אין שיחות. היכנסו לפרופיל של מישהו ולחצו "הודעה".</p>');
+  app.querySelectorAll('[data-c]').forEach(e => e.onclick = () => show('chat', cs.find(c => c.id === e.dataset.c)));
+}
+async function chat(c) {
+  const o = other(c);
+  shell(o.u, '<div id="ml" class="pad" style="padding-bottom:110px"></div><div style="position:fixed;bottom:46px;left:0;right:0;max-width:600px;margin:auto;background:var(--c);padding:8px;display:flex;gap:8px;border-top:1px solid var(--b)"><input id="mi" placeholder="כתבו הודעה..." maxlength="1000" style="margin:0"><button class="btn" id="ms">שלח</button></div>');
+  const load = async () => {
+    const { data } = await sb.from('message').select('*').eq('conversation_id', c.id).order('created_date');
+    const el = $('#ml'); if (!el) return;
+    el.innerHTML = (data || []).map(m => { const mine = m.sender_id === me.id; return `<div style="display:flex;justify-content:${mine ? 'flex-start' : 'flex-end'};margin:4px 0"><div style="max-width:78%;padding:7px 12px;border-radius:14px;background:${mine ? 'var(--p)' : 'var(--b)'};color:${mine ? 'var(--c)' : 'var(--t)'};white-space:pre-wrap;word-break:break-word">${esc(m.text)}</div></div>`; }).join('') || '<p class="m" style="text-align:center">כתבו משהו כדי להתחיל</p>';
+    window.scrollTo(0, document.body.scrollHeight);
+    if ((data || []).some(m => m.receiver_id === me.id && !m.is_read)) sb.from('message').update({ is_read: true }).eq('conversation_id', c.id).eq('receiver_id', me.id).eq('is_read', false).then(() => {});
+  };
+  await load(); timer = setInterval(load, 4000);
+  const send = async () => {
+    const t = $('#mi').value.trim(); if (!t) return; $('#mi').value = '';
+    const r = await sb.from('message').insert({ conversation_id: c.id, sender_id: me.id, sender_username: prof.username, sender_display_name: prof.display_name, sender_avatar: prof.avatar_url || '', receiver_id: o.id, text: t, is_read: false, created_by_id: me.id });
+    if (r.error) return toast('ההודעה לא נשלחה');
+    await sb.from('conversation').update({ last_message: t, last_message_at: new Date().toISOString(), last_sender_id: me.id }).eq('id', c.id);
+    load();
+  };
+  $('#ms').onclick = send; $('#mi').onkeydown = e => { if (e.key === 'Enter') send(); };
+}
+
+async function notif() {
+  shell('התראות', '<p class="pad m">טוען...</p>');
+  const { data } = await sb.from('notification').select('*').eq('user_id', me.id).order('created_date', { ascending: false }).limit(50);
+  const T = { like: 'אהב/ה את הפוסט שלך', comment: 'הגיב/ה לפוסט שלך', follow: 'התחיל/ה לעקוב אחריך' };
+  shell('התראות', (data || []).map(n => `<div class="ph card"><div style="flex:1"><span class="u" data-user="${esc(n.actor_username)}">${esc(n.actor_username)}</span> ${T[n.type] || ''}${n.comment_text ? `<div class="m">${esc(n.comment_text)}</div>` : ''}<div class="m">${ago(n.created_date)}</div></div>${n.post_thumbnail ? `<img src="${esc(n.post_thumbnail)}" alt="" style="width:44px;height:44px;object-fit:cover;border-radius:8px">` : ''}</div>`).join('') || '<p class="pad m" style="text-align:center">אין התראות עדיין</p>');
+  bindUsers();
+  const bc = $('#bc'); if (bc) bc.textContent = '';
+  sb.from('notification').update({ is_read: true }).eq('user_id', me.id).eq('is_read', false).then(() => {});
+}
+
+function search() {
+  shell('חיפוש', '<div class="pad"><input id="q" placeholder="חיפוש אנשים והאשטגים" autofocus><div id="r"></div></div>');
+  let t;
+  $('#q').oninput = e => {
+    clearTimeout(t);
+    t = setTimeout(async () => {
+      const q = e.target.value.trim().replace(/^#/, '').replace(/[^\w\u0590-\u05FF.]/g, '').toLowerCase();
+      if (!q) { $('#r').innerHTML = ''; return; }
+      const [{ data: us }, { data: ps }] = await Promise.all([
+        sb.from('profile').select('*').or(`username.ilike.%${q}%,display_name.ilike.%${q}%`).limit(20),
+        sb.from('post').select('*').contains('hashtags', [q]).eq('is_archived', false).limit(30)]);
+      $('#r').innerHTML = (us || []).map(u => `<div class="ph" style="padding-inline:0">${av(u, 44)}<div class="u" data-user="${esc(u.username)}"><div>${esc(u.username)}</div><div class="m">${esc(u.display_name)}</div></div></div>`).join('')
+        + ((ps || []).length ? `<h3>#${esc(q)}</h3><div class="grid">${ps.map(x => `<img data-user="${esc(x.author_username)}" src="${esc(x.images?.[0] || '')}" alt="${esc(x.caption || 'פוסט')}">`).join('')}</div>` : '')
+        || '<p class="m">לא נמצאו תוצאות</p>';
+      bindUsers();
+    }, 300);
+  };
+}
+
+function settings() {
+  shell('הגדרות', `<div class="pad"><div style="display:flex;gap:12px;align-items:center">${av(prof, 64)}<label class="btn o" style="cursor:pointer">החלפת תמונה<input type="file" id="af" accept="image/*" hidden></label></div>
+  <input id="dn" value="${esc(prof.display_name)}" maxlength="30" placeholder="שם תצוגה"><textarea id="bi" rows="3" maxlength="150" placeholder="ביו">${esc(prof.bio || '')}</textarea>
+  <p><button class="btn" id="sv">שמירה</button></p><hr style="border:0;border-top:1px solid var(--b)">
+  <input id="np" type="password" placeholder="סיסמה חדשה (8 תווים לפחות)" dir="ltr" autocomplete="new-password"><p><button class="btn o" id="cp">שינוי סיסמה</button></p><hr style="border:0;border-top:1px solid var(--b)">
+  <p><button class="lnk" data-l="terms">תנאי שימוש</button> · <button class="lnk" data-l="privacy">מדיניות פרטיות</button> · <button class="lnk" data-l="rules">כללי קהילה</button></p>
+  <p><button class="btn o" id="out">התנתקות</button></p></div>`);
+  $('#af').onchange = async e => { if (await uploadAvatar(e.target.files[0])) settings(); };
+  $('#sv').onclick = async () => {
+    const r = await sb.from('profile').update({ display_name: $('#dn').value.trim() || prof.username, bio: $('#bi').value.trim() }).eq('user_id', me.id);
+    if (r.error) return toast('השמירה נכשלה'); prof.display_name = $('#dn').value.trim() || prof.username; prof.bio = $('#bi').value.trim(); toast('נשמר');
+  };
+  $('#cp').onclick = async () => {
+    const pw = $('#np').value; if (pw.length < 8) return toast('הסיסמה חייבת להכיל לפחות 8 תווים');
+    const r = await sb.auth.updateUser({ password: pw }); toast(r.error ? 'שינוי הסיסמה נכשל' : 'הסיסמה עודכנה'); $('#np').value = '';
+  };
+  app.querySelectorAll('[data-l]').forEach(b => b.onclick = () => show('legal', b.dataset.l));
+  $('#out').onclick = async () => { await sb.auth.signOut(); location.reload(); };
+}
+
+async function onb() {
+  const { data: us } = await sb.from('profile').select('*').neq('user_id', me.id).order('created_date', { ascending: false }).limit(8);
+  shell('ברוכים הבאים', `<div class="pad"><h2>נעים להכיר, ${esc(prof.display_name)} 👋</h2><p class="m">בחרו תמונת פרופיל והתחילו לעקוב אחרי אנשים.</p>
+  <label class="btn o" style="cursor:pointer">בחירת תמונת פרופיל<input type="file" id="af" accept="image/*" hidden></label>
+  <h3>אנשים שאולי תכירו</h3>${(us || []).map(u => `<div class="ph" style="padding-inline:0">${av(u, 44)}<div class="u" style="flex:1" data-user="${esc(u.username)}">${esc(u.username)}</div><button class="btn o fl" data-id="${u.user_id}" data-u="${esc(u.username)}">עקוב</button></div>`).join('') || '<p class="m">אתם הראשונים כאן!</p>'}
+  <p><button class="btn" id="dn" style="width:100%">סיום</button></p></div>`);
+  $('#af').onchange = async e => { await uploadAvatar(e.target.files[0]); };
+  app.querySelectorAll('.fl').forEach(b => b.onclick = async () => { const r = await followUser(b.dataset.id, b.dataset.u); if (!r.error) { b.textContent = 'עוקב'; b.disabled = true; } });
+  bindUsers(); $('#dn').onclick = () => show('home');
+}
+
+function legal(k) {
+  const L = {
+    terms: ['תנאי שימוש', ['השימוש בריזלו מהווה הסכמה לתנאים אלה.', 'אתם שומרים על הזכויות בתוכן שאתם מעלים ומתחייבים שיש לכם זכות לפרסם אותו.', 'אין לפרסם תוכן פוגעני, מטעה, אלים, מיני או בלתי חוקי. חשבונות שיפרו את הכללים עלולים להיות מוגבלים או מושעים.', 'השירות ניתן כפי שהוא, ללא התחייבות לזמינות רציפה. ייתכנו עדכונים בתנאים, והמשך שימוש משמעו הסכמה להם.']],
+    privacy: ['מדיניות פרטיות', ['נשמרים שם המשתמש, שם התצוגה, התוכן שאתם מפרסמים ופעילות כמו לייקים, תגובות ומעקבים.', 'המידע משמש להצגת הפיד והפרופיל, לשליחת התראות ולשמירה על בטיחות הקהילה. איננו מוכרים מידע אישי.', 'פוסטים, פרופילים ותגובות גלויים למשתמשים מחוברים. הודעות פרטיות נראות רק לשולח ולמקבל.', 'אפשר לפנות למנהל האתר כדי למחוק את החשבון והתוכן.']],
+    rules: ['כללי קהילה', ['כבוד הדדי: אין להטריד, לאיים או להשפיל.', 'תוכן הולם: אין לפרסם תוכן מיני, אלים או לא חוקי.', 'בלי ספאם: אין לשלוח הודעות פרסומיות חוזרות.', 'פרטיות של אחרים: אין לפרסם מידע או תמונות של אחרים בלי הסכמתם.']]
+  }[k];
+  shell(L[0], `<div class="pad">${L[1].map(t => `<p>${esc(t)}</p>`).join('')}<p><button class="btn o" id="bk">חזרה</button></p></div>`);
+  $('#bk').onclick = () => show('settings');
+}
+</script>
+</body>
+</html>
